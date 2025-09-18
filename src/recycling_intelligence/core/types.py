@@ -65,6 +65,8 @@ class SortingAction:
     actuator: str
     priority: int
     probability: float
+    policy_weight: float = 1.0
+    lane_score: float = 0.0
 
 
 @dataclass
@@ -74,11 +76,22 @@ class SortingDecision:
     detection: MaterialDetection
     actions: List[SortingAction]
     reasoning_trace: List[str] = field(default_factory=list)
+    latency_breakdown: Dict[str, float] = field(default_factory=dict)
+    policy_weights: Dict[str, float] = field(default_factory=dict)
+    total_latency_budget_ms: float = 0.0
 
     def best_action(self) -> SortingAction:
         if not self.actions:
             raise ValueError("No actions available for decision")
         return max(self.actions, key=lambda action: action.probability)
+
+    def record_stage_latency(self, stage: str, latency_ms: float) -> None:
+        """Attach latency metrics for downstream analytics."""
+
+        self.latency_breakdown[stage] = latency_ms
+
+    def total_latency(self) -> float:
+        return sum(self.latency_breakdown.values())
 
 
 @dataclass

@@ -10,6 +10,7 @@ def test_stream_processor_infer():
     async def workload(index: int):
         return await simulate_task(2.0 + index)
 
-    latencies = asyncio.run(processor.infer(5, workload))
-    assert len(latencies) == 5
-    assert all(latency >= 1.0 for latency in latencies)
+    decisions = asyncio.run(processor.infer(5, workload))
+    assert len(decisions) == 5
+    assert all(decision.predicted_latency_ms >= 1.0 for decision in decisions)
+    assert all(0.0 <= decision.queue_level <= 1.0 for decision in decisions)

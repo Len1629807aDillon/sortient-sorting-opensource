@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from typing import Awaitable, Callable, Iterable, List
 
 from .edge_node import EdgeNode, EdgeTask
-from .scheduler import EdgeScheduler
+from .scheduler import EdgeScheduler, SchedulingDecision
 
 
 @dataclass
@@ -16,13 +16,13 @@ class StreamProcessor:
 
     scheduler: EdgeScheduler
 
-    async def process(self, tasks: Iterable[EdgeTask]) -> List[float]:
-        latencies: List[float] = []
+    async def process(self, tasks: Iterable[EdgeTask]) -> List[SchedulingDecision]:
+        decisions: List[SchedulingDecision] = []
         for task in tasks:
             decision = await self.scheduler.schedule(task)
-            latencies.append(decision.predicted_latency_ms)
+            decisions.append(decision)
         await self.scheduler.rebalance()
-        return latencies
+        return decisions
 
     @classmethod
     def with_nodes(cls, node_ids: Iterable[str]) -> "StreamProcessor":
@@ -30,7 +30,7 @@ class StreamProcessor:
         scheduler = EdgeScheduler(nodes=nodes)
         return cls(scheduler=scheduler)
 
-    async def infer(self, count: int, workload_factory: Callable[[int], Awaitable[float]]) -> List[float]:
+    async def infer(self, count: int, workload_factory: Callable[[int], Awaitable[float]]) -> List[SchedulingDecision]:
         tasks = [
             EdgeTask(identifier=f"task_{i}", coro_factory=lambda i=i: workload_factory(i), estimated_latency_ms=4.0)
             for i in range(count)

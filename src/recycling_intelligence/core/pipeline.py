@@ -50,6 +50,8 @@ class RecyclingIntelligenceSystem:
                 "lane_paper": MaterialCategory.PAPER,
                 "lane_organic": MaterialCategory.ORGANIC,
                 "lane_e_waste": MaterialCategory.E_WASTE,
+                "lane_textile": MaterialCategory.TEXTILE,
+                "lane_reject": MaterialCategory.UNKNOWN,
             },
             max_throughput_per_min=3000,
             feature_space=DEFAULT_FEATURE_SPACE,
@@ -84,27 +86,41 @@ class RecyclingIntelligenceSystem:
             features = sample.features
             self.monitoring.log_feature_vector(features)
             latency_budget.consume(detection_latency)
+            stage_latencies = {"sensing": detection_latency}
 
             predictions = self.sorter.predict(features)
             inference_latency = self._simulate_stage_latency(self.stages[1])
             latency_budget.consume(inference_latency)
+            stage_latencies["inference"] = inference_latency
             detection = MaterialDetection(
                 material_id=sample.identifier,
                 category=predictions.category,
                 confidence=predictions.confidence,
                 contamination=predictions.contamination,
                 features=features,
-                metadata={"throughput": stream.items_per_minute},
+                metadata={
+                    "throughput": stream.items_per_minute,
+                    "stage_sensing_ms": detection_latency,
+                    "stage_inference_ms": inference_latency,
+                    "contamination_probability": sample.contamination_probability,
+                },
             )
             self.confusion.update(predictions.category, sample.category)
 
-            decision = self.decision_engine.decide(detection)
+            decision = self.decision_engine.decide(
+                detection,
+                stage_latencies=stage_latencies,
+                remaining_budget_ms=latency_budget.remaining(),
+                total_budget_ms=self.latency_budget.budget_ms,
+            )
             decision_latency = self._simulate_stage_latency(self.stages[2])
             latency_budget.consume(decision_latency)
+            decision.record_stage_latency("decision", decision_latency)
 
             await self.decision_engine.execute(decision)
             actuation_latency = self._simulate_stage_latency(self.stages[3])
             latency_budget.consume(actuation_latency)
+            decision.record_stage_latency("actuation", actuation_latency)
 
             processed += 1
             self.throughput.update(stream.items_per_minute)

@@ -2,12 +2,16 @@
 
 Recycling Intelligence is an open research and engineering platform for high-performance recycling facilities. The project combines deep learning-based material recognition, low-latency edge computing, and adaptive mechanical sorting to deliver 99%+ purity with millisecond decision latency. It is designed for academic researchers, industrial automation teams, and sustainability innovators who want to experiment with intelligent recycling workflows.
 
+## Why it matters (plain English)
+
+Modern recycling plants move thousands of bottles, cans, fibres, and circuit boards every minute. Human spotters or fixed-rule systems cannot keep up, especially when materials arrive contaminated or in unexpected shapes. This project simulates how an AI-enabled facility "sees" each item, chooses the right chute, and keeps conveyor belts flowing without blowing past the millisecond timing windows that real hardware requires. You can run the system end-to-end on a laptop to understand each decision, yet the architecture mirrors what production plants deploy.
+
 ## Key Capabilities
 
 - **Deep Learning for Waste** – A configurable neural network (`DeepWasteSorter`) processes multi-modal sensor data to recognise plastics, metals, fibre products, organics, and emerging material classes.
-- **Smart Sorting Edge** – An event-driven edge scheduler orchestrates inference workloads across local compute nodes with latency budgets tuned for conveyor speeds of 1.5–6 m/s.
-- **Material Sorting System** – Mechanical actuator models and policy-driven decision logic deliver lane assignments, actuator commands, and contamination-aware routing strategies.
-- **Real-Time Analytics** – Streaming telemetry exposes confidence, contamination, throughput, and latency metrics for operational dashboards and research instrumentation.
+- **Smart Sorting Edge** – A latency-aware scheduler weighs queue depth, utilisation, and headroom before dispatching inference workloads to edge nodes, continuously rebalancing to stay under a 12 ms budget even as demand spikes.
+- **Material Sorting System** – Mechanical actuator models and policy-driven decision logic compute lane suitability, actuator selection, and contamination-aware fallback routes while keeping a detailed reasoning trail per item.
+- **Real-Time Analytics** – Streaming telemetry exposes confidence, contamination, throughput, and per-stage latency metrics that feed dashboards, anomaly detectors, or research notebooks.
 
 ## Architecture Overview
 
@@ -27,8 +31,8 @@ The system is split across four domains:
 
 1. **Data Generation** – `SyntheticWasteStream` produces realistic, high-throughput streams with contamination bias controls for experimentation.
 2. **Machine Learning** – `DeepWasteSorter` builds a multi-layer network with GELU activations, per-category softmax outputs, and contamination scoring.
-3. **Edge Orchestration** – `EdgeScheduler` and `StreamProcessor` simulate concurrent inference on edge compute clusters, enforcing sub-10ms latency budgets.
-4. **Sorting Execution** – `SortingDecisionEngine` fuses predictions with policies to trigger actuators via `ActuatorBank`, while `MonitoringHub` captures decision traces and system metrics.
+3. **Edge Orchestration** – `EdgeScheduler` and `StreamProcessor` simulate concurrent inference on edge compute clusters, weighing utilisation, queue depth, and headroom before dispatching work.
+4. **Sorting Execution** – `SortingDecisionEngine` fuses predictions with policies to trigger actuators via `ActuatorBank`, while `MonitoringHub` captures decision traces, latency profiles, and system metrics.
 
 ## Getting Started
 
@@ -68,25 +72,25 @@ stage_latency_mean: {'sensing': 3.9, 'inference': 6.1, 'decision': 3.1, 'actuati
 
 ## Research-Grade Sorting Decisions
 
-The decision engine captures reasoning traces for every routed item, including:
+The decision engine now records machine-readable reasoning traces for every routed item:
 
-- Lane suitability score factoring probability, confidence, and contamination levels.
-- Policy-derived priority weighting and actuator selection.
-- Latency budgets tracked across sensing, inference, decisioning, and actuation stages.
+- **Lane suitability** combines predicted probability, model confidence, lane alignment, and contamination penalties into a continuous score.
+- **Policy weights** quantify actuator priorities and fallback rules, enabling optimisation studies or reinforcement learning agents to plug in.
+- **Latency budgets** persist per-stage timings (sensing, inference, decisioning, actuation) alongside remaining headroom so researchers can test new control strategies without breaking millisecond constraints.
 
-This structure enables experimentation with reinforcement learning, Bayesian decision theory, or operations research formulations by swapping out `SortingPolicy` or extending `SortingDecisionEngine`.
+`SortingDecision` exposes these values via `reasoning_trace`, `policy_weights`, and `latency_breakdown`, allowing downstream analytics or experiments to consume structured evidence instead of opaque decisions.
 
 ## Edge Performance Simulation
 
 `StreamProcessor` coordinates workloads across `EdgeNode` instances to validate latency strategies:
 
-- Weighted queue depth and utilization metrics determine node selection.
-- Dynamic rebalancing maintains throughput under tight sub-12ms latency thresholds.
-- The `simulate_task` helper mimics inference kernels for profiling custom workloads.
+- Weighted queue depth, utilisation, and latency headroom determine node selection.
+- Dynamic rebalancing siphons queued tasks away from overloaded nodes to hold throughput under tight sub-12 ms latency thresholds.
+- The `simulate_task` helper mimics inference kernels with realistic jitter for profiling custom workloads.
 
 ## Analytics and Telemetry
 
-`MonitoringHub` captures feature statistics, detection confidences, and latency usage, which can be fed into dashboards or anomaly detectors. Use `MonitoringHub.event_history()` to obtain a chronological log of events for audit or research analysis.
+`MonitoringHub` captures feature statistics, detection confidences, contamination trends, throughput averages, and stage latency profiles. Use `MonitoringHub.event_history()` for chronological audit logs and `MonitoringHub.latency_profile()` when tuning conveyor timing or edge budgets.
 
 ## Testing
 
